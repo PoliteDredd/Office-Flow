@@ -1,0 +1,865 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Dashboard - officeFlow</title>
+    <link rel="stylesheet" href="../styles/base.css">
+    <link rel="stylesheet" href="../styles/dashboard.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body class="dashboard-body">
+    <!-- Top Navigation Bar -->
+    <nav class="top-nav">
+        <div class="nav-brand clickable-logo" id="navBrand" title="Click to open menu">
+            <div class="nav-logo">
+                <i class="fas fa-building"></i>
+            </div>
+            <span class="nav-title">officeFlow</span>
+            <div class="menu-hint" id="menuHint">
+                <i class="fas fa-chevron-down"></i>
+            </div>
+            <div class="logo-tooltip">Tap to open menu</div>
+        </div>
+        
+        <div class="nav-user">
+            <button class="settings-btn" id="settingsBtn" title="Settings">
+                <i class="fas fa-cog"></i>
+            </button>
+            <div class="user-info">
+                <button class="user-avatar" id="userAvatarBtn" title="Profile">
+                    <i class="fas fa-user"></i>
+                </button>
+                <div class="user-details">
+                    <span class="user-name" id="userName">John Doe</span>
+                    <span class="user-role">Employee</span>
+                </div>
+            </div>
+            <button class="logout-btn" id="logoutBtn">
+                <i class="fas fa-sign-out-alt"></i>
+                <span>Logout</span>
+            </button>
+        </div>
+    </nav>
+
+    <!-- Main Dashboard Container -->
+    <div class="dashboard-container">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar">
+            <nav class="sidebar-nav">
+                <ul class="nav-menu">
+                    <li class="nav-item">
+                        <a href="#" class="nav-link active" data-section="overview">
+                            <i class="fas fa-tachometer-alt"></i>
+                            <span>Overview</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="#" class="nav-link" data-section="submit-request">
+                            <i class="fas fa-plus-circle"></i>
+                            <span>Submit Request</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="#" class="nav-link" data-section="your-requests">
+                            <i class="fas fa-list-alt"></i>
+                            <span>Your Requests</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="#" class="nav-link" data-section="it-support">
+                            <i class="fas fa-laptop"></i>
+                            <span>IT Support</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="#" class="nav-link" data-section="maintenance">
+                            <i class="fas fa-tools"></i>
+                            <span>Maintenance</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="#" class="nav-link" data-section="hr-services">
+                            <i class="fas fa-users"></i>
+                            <span>HR Services</span>
+                        </a>
+                    </li>
+                    <li class="nav-item nav-divider"></li>
+                    <li class="nav-item">
+                        <a href="#" class="nav-link" data-section="profile">
+                            <i class="fas fa-user-circle"></i>
+                            <span>Profile</span>
+                        </a>
+                    </li>
+                    <li class="nav-item">
+                        <a href="#" class="nav-link" data-section="settings">
+                            <i class="fas fa-cog"></i>
+                            <span>Settings</span>
+                        </a>
+                    </li>
+                </ul>
+            </nav>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="main-content">
+            <!-- Overview Section -->
+            <section id="overview" class="content-section active">
+                <div class="section-header">
+                    <h1 class="section-title">Dashboard Overview</h1>
+                    <p class="section-subtitle">Welcome back! Here's what's happening with your requests.</p>
+                </div>
+
+                <!-- Stats Cards -->
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-icon">
+                            <i class="fas fa-clock"></i>
+                        </div>
+                        <div class="stat-info">
+                            <span class="stat-number" id="pendingCount">3</span>
+                            <span class="stat-label">Pending Requests</span>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">
+                            <i class="fas fa-check-circle"></i>
+                        </div>
+                        <div class="stat-info">
+                            <span class="stat-number" id="completedCount">12</span>
+                            <span class="stat-label">Completed</span>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">
+                            <i class="fas fa-calendar-alt"></i>
+                        </div>
+                        <div class="stat-info">
+                            <span class="stat-number" id="leaveBalance">15</span>
+                            <span class="stat-label">Leave Days Left</span>
+                        </div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-icon">
+                            <i class="fas fa-chart-line"></i>
+                        </div>
+                        <div class="stat-info">
+                            <span class="stat-number" id="thisMonth">5</span>
+                            <span class="stat-label">This Month</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Recent Activity -->
+                <div class="recent-activity">
+                    <h2 class="activity-title">Recent Activity</h2>
+                    <div class="activity-list" id="recentActivity">
+                        <!-- Activity items will be populated by JavaScript -->
+                    </div>
+                </div>
+            </section>
+
+            <!-- Submit New Request Section -->
+            <section id="submit-request" class="content-section">
+                <div class="section-header">
+                    <h1 class="section-title">Submit New Request</h1>
+                    <p class="section-subtitle">Create a new service request for IT, Maintenance, or HR support.</p>
+                </div>
+
+                <div class="form-container">
+                    <form id="requestForm" class="request-form">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="requestTitle" class="form-label">
+                                    <i class="fas fa-heading"></i>
+                                    Request Title
+                                </label>
+                                <input 
+                                    type="text" 
+                                    id="requestTitle" 
+                                    name="title" 
+                                    class="form-input" 
+                                    placeholder="Brief description of your request"
+                                    required
+                                >
+                            </div>
+                            <div class="form-group">
+                                <label for="requestCategory" class="form-label">
+                                    <i class="fas fa-tags"></i>
+                                    Category
+                                </label>
+                                <select id="requestCategory" name="category" class="form-select" required>
+                                    <option value="">Select Category</option>
+                                    <option value="IT">IT Support</option>
+                                    <option value="Maintenance">Maintenance</option>
+                                    <option value="HR">HR Services</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="requestPriority" class="form-label">
+                                <i class="fas fa-exclamation-triangle"></i>
+                                Priority Level
+                            </label>
+                            <select id="requestPriority" name="priority" class="form-select" required>
+                                <option value="">Select Priority</option>
+                                <option value="Low">Low</option>
+                                <option value="Medium">Medium</option>
+                                <option value="High">High</option>
+                                <option value="Urgent">Urgent</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="requestDescription" class="form-label">
+                                <i class="fas fa-align-left"></i>
+                                Description
+                            </label>
+                            <textarea 
+                                id="requestDescription" 
+                                name="description" 
+                                class="form-textarea" 
+                                placeholder="Provide detailed information about your request..."
+                                rows="5"
+                                required
+                            ></textarea>
+                        </div>
+
+                        <div class="form-actions">
+                            <button type="button" class="btn-secondary" id="clearForm">
+                                <i class="fas fa-times"></i>
+                                Clear Form
+                            </button>
+                            <button type="submit" class="btn-primary" id="submitRequest">
+                                <i class="fas fa-paper-plane"></i>
+                                Submit Request
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </section>
+
+            <!-- Your Requests Section -->
+            <section id="your-requests" class="content-section">
+                <div class="section-header">
+                    <h1 class="section-title">Your Requests</h1>
+                    <p class="section-subtitle">Track and manage all your submitted requests.</p>
+                </div>
+
+                <!-- Filter Bar -->
+                <div class="filter-bar">
+                    <div class="filter-group">
+                        <label for="statusFilter" class="filter-label">Status:</label>
+                        <select id="statusFilter" class="filter-select">
+                            <option value="">All Status</option>
+                            <option value="Pending">Pending</option>
+                            <option value="In Progress">In Progress</option>
+                            <option value="Completed">Completed</option>
+                            <option value="Rejected">Rejected</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <label for="categoryFilter" class="filter-label">Category:</label>
+                        <select id="categoryFilter" class="filter-select">
+                            <option value="">All Categories</option>
+                            <option value="IT">IT Support</option>
+                            <option value="Maintenance">Maintenance</option>
+                            <option value="HR">HR Services</option>
+                        </select>
+                    </div>
+                    <div class="filter-group">
+                        <button class="filter-clear" id="clearFilters">
+                            <i class="fas fa-times"></i>
+                            Clear Filters
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Requests Grid -->
+                <div class="requests-grid" id="requestsGrid">
+                    <!-- Request cards will be populated by JavaScript -->
+                </div>
+            </section>
+
+            <!-- IT Support Section -->
+            <section id="it-support" class="content-section">
+                <div class="section-header">
+                    <h1 class="section-title">IT Support</h1>
+                    <p class="section-subtitle">Get help with technology-related issues and requests.</p>
+                </div>
+
+                <div class="service-categories">
+                    <div class="service-card">
+                        <div class="service-icon">
+                            <i class="fas fa-desktop"></i>
+                        </div>
+                        <h3 class="service-title">Hardware Issues</h3>
+                        <p class="service-description">Computer, printer, or equipment problems</p>
+                        <button class="service-btn" data-category="IT" data-type="Hardware">
+                            Request Support
+                        </button>
+                    </div>
+                    <div class="service-card">
+                        <div class="service-icon">
+                            <i class="fas fa-code"></i>
+                        </div>
+                        <h3 class="service-title">Software Support</h3>
+                        <p class="service-description">Application installation or troubleshooting</p>
+                        <button class="service-btn" data-category="IT" data-type="Software">
+                            Request Support
+                        </button>
+                    </div>
+                    <div class="service-card">
+                        <div class="service-icon">
+                            <i class="fas fa-wifi"></i>
+                        </div>
+                        <h3 class="service-title">Network Issues</h3>
+                        <p class="service-description">Internet, WiFi, or connectivity problems</p>
+                        <button class="service-btn" data-category="IT" data-type="Network">
+                            Request Support
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Maintenance Section -->
+            <section id="maintenance" class="content-section">
+                <div class="section-header">
+                    <h1 class="section-title">Maintenance</h1>
+                    <p class="section-subtitle">Report facility issues and request maintenance services.</p>
+                </div>
+
+                <div class="service-categories">
+                    <div class="service-card">
+                        <div class="service-icon">
+                            <i class="fas fa-lightbulb"></i>
+                        </div>
+                        <h3 class="service-title">Electrical</h3>
+                        <p class="service-description">Lighting, power outlets, or electrical issues</p>
+                        <button class="service-btn" data-category="Maintenance" data-type="Electrical">
+                            Report Issue
+                        </button>
+                    </div>
+                    <div class="service-card">
+                        <div class="service-icon">
+                            <i class="fas fa-wrench"></i>
+                        </div>
+                        <h3 class="service-title">Plumbing</h3>
+                        <p class="service-description">Water leaks, drainage, or plumbing problems</p>
+                        <button class="service-btn" data-category="Maintenance" data-type="Plumbing">
+                            Report Issue
+                        </button>
+                    </div>
+                    <div class="service-card">
+                        <div class="service-icon">
+                            <i class="fas fa-snowflake"></i>
+                        </div>
+                        <h3 class="service-title">HVAC</h3>
+                        <p class="service-description">Heating, cooling, or ventilation issues</p>
+                        <button class="service-btn" data-category="Maintenance" data-type="HVAC">
+                            Report Issue
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- HR Services Section -->
+            <section id="hr-services" class="content-section">
+                <div class="section-header">
+                    <h1 class="section-title">HR Services</h1>
+                    <p class="section-subtitle">Manage your leave, benefits, and HR-related requests.</p>
+                </div>
+
+                <!-- Leave Balance Card -->
+                <div class="leave-balance-card">
+                    <div class="balance-header">
+                        <h3 class="balance-title">
+                            <i class="fas fa-calendar-check"></i>
+                            Leave Balance
+                        </h3>
+                        <span class="balance-year">2024</span>
+                    </div>
+                    <div class="balance-grid">
+                        <div class="balance-item">
+                            <span class="balance-type">Annual Leave</span>
+                            <span class="balance-days" id="annualLeave">15 days</span>
+                        </div>
+                        <div class="balance-item">
+                            <span class="balance-type">Sick Leave</span>
+                            <span class="balance-days" id="sickLeave">8 days</span>
+                        </div>
+                        <div class="balance-item">
+                            <span class="balance-type">Personal Leave</span>
+                            <span class="balance-days" id="personalLeave">3 days</span>
+                        </div>
+                        <div class="balance-item">
+                            <span class="balance-type">Emergency Leave</span>
+                            <span class="balance-days" id="emergencyLeave">5 days</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- HR Services -->
+                <div class="service-categories">
+                    <div class="service-card">
+                        <div class="service-icon">
+                            <i class="fas fa-calendar-plus"></i>
+                        </div>
+                        <h3 class="service-title">Request Leave</h3>
+                        <p class="service-description">Apply for vacation, sick, or personal leave</p>
+                        <button class="service-btn" data-category="HR" data-type="Leave">
+                            Apply for Leave
+                        </button>
+                    </div>
+                    <div class="service-card">
+                        <div class="service-icon">
+                            <i class="fas fa-file-alt"></i>
+                        </div>
+                        <h3 class="service-title">Documents</h3>
+                        <p class="service-description">Request certificates, letters, or HR documents</p>
+                        <button class="service-btn" data-category="HR" data-type="Documents">
+                            Request Document
+                        </button>
+                    </div>
+                    <div class="service-card">
+                        <div class="service-icon">
+                            <i class="fas fa-user-edit"></i>
+                        </div>
+                        <h3 class="service-title">Profile Update</h3>
+                        <p class="service-description">Update personal information or contact details</p>
+                        <button class="service-btn" data-category="HR" data-type="Profile">
+                            Update Profile
+                        </button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Profile Section -->
+            <section id="profile" class="content-section">
+                <div class="section-header">
+                    <h1 class="section-title">Profile</h1>
+                    <p class="section-subtitle">Manage your personal information and preferences.</p>
+                </div>
+
+                <!-- Profile Card -->
+                <div class="profile-card">
+                    <div class="profile-header">
+                        <div class="profile-avatar-section">
+                            <div class="profile-avatar-large" id="profileAvatarLarge">
+                                <i class="fas fa-user"></i>
+                            </div>
+                            <button class="change-avatar-btn" id="changeAvatarBtn">
+                                <i class="fas fa-camera"></i>
+                                Change Avatar
+                            </button>
+                        </div>
+                        <div class="profile-info">
+                            <h2 class="profile-name" id="profileName">John Doe</h2>
+                            <p class="profile-email" id="profileEmail">john.doe@company.com</p>
+                            <span class="profile-role" id="profileRole">Employee</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Profile Form -->
+                <div class="profile-form-container">
+                    <form id="profileForm" class="profile-form">
+                        <div class="form-section">
+                            <h3 class="form-section-title">
+                                <i class="fas fa-user"></i>
+                                Personal Information
+                            </h3>
+                            
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="firstName" class="form-label">First Name</label>
+                                    <input type="text" id="firstName" name="firstName" class="form-input" value="John" required>
+                                </div>
+                                <div class="form-group">
+                                    <label for="lastName" class="form-label">Last Name</label>
+                                    <input type="text" id="lastName" name="lastName" class="form-input" value="Doe" required>
+                                </div>
+                            </div>
+
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="email" class="form-label">Email Address</label>
+                                    <input type="email" id="email" name="email" class="form-input" value="john.doe@company.com" required>
+                                </div>
+                                <div class="form-group">
+                                    <label for="phoneNumber" class="form-label">Phone Number</label>
+                                    <input type="tel" id="phoneNumber" name="phoneNumber" class="form-input" value="+1 (555) 123-4567">
+                                </div>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="jobTitle" class="form-label">Job Title <span class="optional">(Optional)</span></label>
+                                <input type="text" id="jobTitle" name="jobTitle" class="form-input" value="Software Engineer" placeholder="Enter your job title">
+                            </div>
+                        </div>
+
+                        <div class="form-section">
+                            <h3 class="form-section-title">
+                                <i class="fas fa-cog"></i>
+                                Preferences
+                            </h3>
+                            
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="defaultCategory" class="form-label">Default Request Category</label>
+                                    <select id="defaultCategory" name="defaultCategory" class="form-select">
+                                        <option value="">No Default</option>
+                                        <option value="IT">IT Support</option>
+                                        <option value="Maintenance">Maintenance</option>
+                                        <option value="HR">HR Services</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label for="timezone" class="form-label">Time Zone</label>
+                                    <select id="timezone" name="timezone" class="form-select">
+                                        <option value="America/New_York">Eastern Time (ET)</option>
+                                        <option value="America/Chicago">Central Time (CT)</option>
+                                        <option value="America/Denver">Mountain Time (MT)</option>
+                                        <option value="America/Los_Angeles">Pacific Time (PT)</option>
+                                        <option value="UTC">UTC</option>
+                                    </select>
+                                </div>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="dateFormat" class="form-label">Date Format</label>
+                                <select id="dateFormat" name="dateFormat" class="form-select">
+                                    <option value="MM/DD/YYYY">MM/DD/YYYY (US Format)</option>
+                                    <option value="DD/MM/YYYY">DD/MM/YYYY (European Format)</option>
+                                    <option value="YYYY-MM-DD">YYYY-MM-DD (ISO Format)</option>
+                                    <option value="MMM DD, YYYY">MMM DD, YYYY (Long Format)</option>
+                                </select>
+                            </div>
+                        </div>
+
+                        <div class="form-section">
+                            <h3 class="form-section-title">
+                                <i class="fas fa-universal-access"></i>
+                                Accessibility Options
+                            </h3>
+                            
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="fontSize" class="form-label">Font Size</label>
+                                    <select id="fontSize" name="fontSize" class="form-select">
+                                        <option value="small">Small</option>
+                                        <option value="medium" selected>Medium</option>
+                                        <option value="large">Large</option>
+                                        <option value="extra-large">Extra Large</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label class="checkbox-wrapper">
+                                        <input type="checkbox" id="highContrast" name="highContrast">
+                                        <span class="checkmark"></span>
+                                        High Contrast Mode
+                                    </label>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-section">
+                            <h3 class="form-section-title">
+                                <i class="fas fa-shield-alt"></i>
+                                Security
+                            </h3>
+                            
+                            <div class="security-actions">
+                                <button type="button" class="btn-secondary" id="changePasswordBtn" disabled>
+                                    <i class="fas fa-key"></i>
+                                    Change Password
+                                    <span class="coming-soon">(Available with Firebase)</span>
+                                </button>
+                                <button type="button" class="btn-danger" id="deactivateAccountBtn">
+                                    <i class="fas fa-user-times"></i>
+                                    Request Account Deactivation
+                                </button>
+                            </div>
+                        </div>
+
+                        <div class="form-actions">
+                            <button type="button" class="btn-secondary" id="resetProfileForm">
+                                <i class="fas fa-undo"></i>
+                                Reset Changes
+                            </button>
+                            <button type="submit" class="btn-primary" id="saveProfile">
+                                <i class="fas fa-save"></i>
+                                Save Changes
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </section>
+
+            <!-- Settings Section -->
+            <section id="settings" class="content-section">
+                <div class="section-header">
+                    <h1 class="section-title">Settings</h1>
+                    <p class="section-subtitle">Customize your officeFlow experience.</p>
+                </div>
+
+                <!-- Settings Tabs -->
+                <div class="settings-tabs">
+                    <button class="settings-tab active" data-tab="appearance">
+                        <i class="fas fa-palette"></i>
+                        Appearance
+                    </button>
+                    <button class="settings-tab" data-tab="profile-settings">
+                        <i class="fas fa-user-cog"></i>
+                        Profile Settings
+                    </button>
+                    <button class="settings-tab" data-tab="notifications">
+                        <i class="fas fa-bell"></i>
+                        Notifications
+                    </button>
+                    <button class="settings-tab" data-tab="privacy">
+                        <i class="fas fa-lock"></i>
+                        Privacy
+                    </button>
+                </div>
+
+                <!-- Appearance Tab -->
+                <div class="settings-content active" id="appearance">
+                    <div class="settings-section">
+                        <h3 class="settings-section-title">
+                            <i class="fas fa-moon"></i>
+                            Theme
+                        </h3>
+                        <div class="theme-options">
+                            <label class="theme-option">
+                                <input type="radio" name="theme" value="light" checked>
+                                <div class="theme-preview light-theme">
+                                    <div class="theme-header"></div>
+                                    <div class="theme-content"></div>
+                                </div>
+                                <span class="theme-name">Light Mode</span>
+                            </label>
+                            <label class="theme-option">
+                                <input type="radio" name="theme" value="dark">
+                                <div class="theme-preview dark-theme">
+                                    <div class="theme-header"></div>
+                                    <div class="theme-content"></div>
+                                </div>
+                                <span class="theme-name">Dark Mode</span>
+                            </label>
+                            <label class="theme-option">
+                                <input type="radio" name="theme" value="auto">
+                                <div class="theme-preview auto-theme">
+                                    <div class="theme-header"></div>
+                                    <div class="theme-content"></div>
+                                </div>
+                                <span class="theme-name">Auto</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="settings-section">
+                        <h3 class="settings-section-title">
+                            <i class="fas fa-palette"></i>
+                            Color Scheme
+                        </h3>
+                        <div class="color-schemes">
+                            <label class="color-scheme-option">
+                                <input type="radio" name="colorScheme" value="warm" checked>
+                                <div class="color-preview warm-colors">
+                                    <span class="color-dot" style="background: #fb923c;"></span>
+                                    <span class="color-dot" style="background: #f87171;"></span>
+                                    <span class="color-dot" style="background: #fbbf24;"></span>
+                                </div>
+                                <span class="color-name">Warm (Current)</span>
+                            </label>
+                            <label class="color-scheme-option">
+                                <input type="radio" name="colorScheme" value="cool">
+                                <div class="color-preview cool-colors">
+                                    <span class="color-dot" style="background: #3b82f6;"></span>
+                                    <span class="color-dot" style="background: #06b6d4;"></span>
+                                    <span class="color-dot" style="background: #8b5cf6;"></span>
+                                </div>
+                                <span class="color-name">Cool</span>
+                            </label>
+                            <label class="color-scheme-option">
+                                <input type="radio" name="colorScheme" value="nature">
+                                <div class="color-preview nature-colors">
+                                    <span class="color-dot" style="background: #10b981;"></span>
+                                    <span class="color-dot" style="background: #84cc16;"></span>
+                                    <span class="color-dot" style="background: #f59e0b;"></span>
+                                </div>
+                                <span class="color-name">Nature</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Profile Settings Tab -->
+                <div class="settings-content" id="profile-settings">
+                    <div class="settings-section">
+                        <h3 class="settings-section-title">
+                            <i class="fas fa-info-circle"></i>
+                            Quick Access to Profile Settings
+                        </h3>
+                        <p class="settings-description">
+                            Manage your personal information, preferences, and accessibility options.
+                        </p>
+                        <button class="btn-primary" id="goToProfile">
+                            <i class="fas fa-user-edit"></i>
+                            Go to Profile Settings
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Notifications Tab -->
+                <div class="settings-content" id="notifications">
+                    <div class="settings-section">
+                        <h3 class="settings-section-title">
+                            <i class="fas fa-envelope"></i>
+                            Email Notifications
+                        </h3>
+                        <div class="notification-options">
+                            <label class="checkbox-wrapper">
+                                <input type="checkbox" id="emailRequestUpdates" checked>
+                                <span class="checkmark"></span>
+                                Request status updates
+                            </label>
+                            <label class="checkbox-wrapper">
+                                <input type="checkbox" id="emailNewRequests" checked>
+                                <span class="checkmark"></span>
+                                New request confirmations
+                            </label>
+                            <label class="checkbox-wrapper">
+                                <input type="checkbox" id="emailReminders">
+                                <span class="checkmark"></span>
+                                Weekly summary reports
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="settings-section">
+                        <h3 class="settings-section-title">
+                            <i class="fas fa-mobile-alt"></i>
+                            Push Notifications
+                        </h3>
+                        <div class="notification-options">
+                            <label class="checkbox-wrapper">
+                                <input type="checkbox" id="pushEnabled">
+                                <span class="checkmark"></span>
+                                Enable push notifications
+                            </label>
+                            <label class="checkbox-wrapper">
+                                <input type="checkbox" id="pushUrgent" checked>
+                                <span class="checkmark"></span>
+                                Urgent requests only
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Privacy Tab -->
+                <div class="settings-content" id="privacy">
+                    <div class="settings-section">
+                        <h3 class="settings-section-title">
+                            <i class="fas fa-eye"></i>
+                            Profile Visibility
+                        </h3>
+                        <div class="privacy-options">
+                            <label class="checkbox-wrapper">
+                                <input type="checkbox" id="showJobTitle" checked>
+                                <span class="checkmark"></span>
+                                Show job title to other users
+                            </label>
+                            <label class="checkbox-wrapper">
+                                <input type="checkbox" id="showEmail">
+                                <span class="checkmark"></span>
+                                Show email to team members
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="settings-section">
+                        <h3 class="settings-section-title">
+                            <i class="fas fa-chart-bar"></i>
+                            Data & Analytics
+                        </h3>
+                        <div class="privacy-options">
+                            <label class="checkbox-wrapper">
+                                <input type="checkbox" id="analyticsOptIn" checked>
+                                <span class="checkmark"></span>
+                                Help improve officeFlow with usage analytics
+                            </label>
+                            <label class="checkbox-wrapper">
+                                <input type="checkbox" id="crashReports" checked>
+                                <span class="checkmark"></span>
+                                Send crash reports automatically
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Settings Actions -->
+                <div class="settings-actions">
+                    <button type="button" class="btn-secondary" id="resetSettings">
+                        <i class="fas fa-undo"></i>
+                        Reset to Defaults
+                    </button>
+                    <button type="button" class="btn-primary" id="saveSettings">
+                        <i class="fas fa-save"></i>
+                        Save Settings
+                    </button>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Avatar Selection Modal -->
+    <div class="modal-overlay" id="avatarModal">
+        <div class="modal">
+            <div class="modal-header">
+                <h3 class="modal-title">Choose Avatar</h3>
+                <button class="modal-close" id="closeAvatarModal">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-content">
+                <div class="avatar-options">
+                    <button class="avatar-option active" data-avatar="user">
+                        <i class="fas fa-user"></i>
+                    </button>
+                    <button class="avatar-option" data-avatar="user-tie">
+                        <i class="fas fa-user-tie"></i>
+                    </button>
+                    <button class="avatar-option" data-avatar="user-graduate">
+                        <i class="fas fa-user-graduate"></i>
+                    </button>
+                    <button class="avatar-option" data-avatar="user-astronaut">
+                        <i class="fas fa-user-astronaut"></i>
+                    </button>
+                    <button class="avatar-option" data-avatar="user-ninja">
+                        <i class="fas fa-user-ninja"></i>
+                    </button>
+                    <button class="avatar-option" data-avatar="smile">
+                        <i class="fas fa-smile"></i>
+                    </button>
+                    <button class="avatar-option" data-avatar="grin">
+                        <i class="fas fa-grin"></i>
+                    </button>
+                    <button class="avatar-option" data-avatar="laugh">
+                        <i class="fas fa-laugh"></i>
+                    </button>
+                </div>
+            </div>
+            <div class="modal-actions">
+                <button class="btn-secondary" id="cancelAvatarChange">Cancel</button>
+                <button class="btn-primary" id="confirmAvatarChange">Save Avatar</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="../scripts/dashboard.js"></script>
+</body>
+</html>
