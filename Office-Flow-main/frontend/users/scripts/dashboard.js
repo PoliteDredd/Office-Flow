@@ -1,0 +1,1343 @@
+/**
+ * officeFlow Dashboard Script
+ * Handles dashboard functionality, navigation, and request management
+ * Prepared for Firebase integration
+ */
+
+// ===== GLOBAL STATE =====
+let currentUser = {
+    id: 'user123',
+    name: 'John Doe',
+    firstName: 'John',
+    lastName: 'Doe',
+    email: 'john.doe@company.com',
+    phoneNumber: '+1 (555) 123-4567',
+    jobTitle: 'Software Engineer',
+    role: 'Employee',
+    department: 'Engineering',
+    avatar: 'user',
+    preferences: {
+        defaultCategory: 'IT',
+        timezone: 'America/New_York',
+        dateFormat: 'MM/DD/YYYY',
+        fontSize: 'medium',
+        highContrast: false,
+        theme: 'light',
+        colorScheme: 'warm'
+    },
+    leaveBalance: {
+        annual: 15,
+        sick: 8,
+        personal: 3,
+        emergency: 5
+    }
+};
+
+let requests = [
+    {
+        id: 'REQ001',
+        title: 'Laptop Screen Flickering',
+        category: 'IT',
+        type: 'Hardware',
+        description: 'My laptop screen has been flickering intermittently for the past few days. It happens mostly when I open multiple applications.',
+        priority: 'Medium',
+        status: 'In Progress',
+        dateSubmitted: '2024-01-10',
+        lastUpdated: '2024-01-11'
+    },
+    {
+        id: 'REQ002',
+        title: 'Annual Leave Request',
+        category: 'HR',
+        type: 'Leave',
+        description: 'Requesting 5 days of annual leave from January 25th to January 29th for a family vacation.',
+        priority: 'Low',
+        status: 'Pending',
+        dateSubmitted: '2024-01-09',
+        lastUpdated: '2024-01-09'
+    },
+    {
+        id: 'REQ003',
+        title: 'Office AC Not Working',
+        category: 'Maintenance',
+        type: 'HVAC',
+        description: 'The air conditioning unit in conference room B is not working properly. The room gets very hot during meetings.',
+        priority: 'High',
+        status: 'Completed',
+        dateSubmitted: '2024-01-08',
+        lastUpdated: '2024-01-10'
+    },
+    {
+        id: 'REQ004',
+        title: 'Software Installation Request',
+        category: 'IT',
+        type: 'Software',
+        description: 'Need Adobe Creative Suite installed on my workstation for upcoming design projects.',
+        priority: 'Medium',
+        status: 'Pending',
+        dateSubmitted: '2024-01-07',
+        lastUpdated: '2024-01-07'
+    },
+    {
+        id: 'REQ005',
+        title: 'Parking Space Assignment',
+        category: 'HR',
+        type: 'General',
+        description: 'Requesting assignment of a parking space closer to the building entrance due to mobility issues.',
+        priority: 'Medium',
+        status: 'Completed',
+        dateSubmitted: '2024-01-05',
+        lastUpdated: '2024-01-08'
+    }
+];
+
+let currentSection = 'overview';
+let filteredRequests = [...requests];
+
+// ===== UTILITY FUNCTIONS =====
+
+/**
+ * Generate unique ID for new requests
+ */
+function generateRequestId() {
+    const timestamp = Date.now();
+    const random = Math.floor(Math.random() * 1000);
+    return `REQ${timestamp}${random}`.slice(-10);
+}
+
+/**
+ * Format date for display based on user preferences
+ */
+function formatDate(dateString) {
+    const date = new Date(dateString);
+    const format = currentUser.preferences.dateFormat;
+    const timezone = currentUser.preferences.timezone;
+    
+    // Convert to user's timezone
+    const options = {
+        timeZone: timezone,
+        year: 'numeric',
+        month: '2-digit',
+        day: '2-digit'
+    };
+    
+    const localDate = new Intl.DateTimeFormat('en-US', options).format(date);
+    
+    switch (format) {
+        case 'DD/MM/YYYY':
+            const [month, day, year] = localDate.split('/');
+            return `${day}/${month}/${year}`;
+        case 'YYYY-MM-DD':
+            const [m, d, y] = localDate.split('/');
+            return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`;
+        case 'MMM DD, YYYY':
+            return date.toLocaleDateString('en-US', {
+                timeZone: timezone,
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric'
+            });
+        default: // MM/DD/YYYY
+            return localDate;
+    }
+}
+
+/**
+ * Get current timestamp in user's timezone
+ */
+function getCurrentTimestamp() {
+    const now = new Date();
+    return now.toISOString().split('T')[0];
+}
+
+/**
+ * Get status class for styling
+ */
+function getStatusClass(status) {
+    const statusMap = {
+        'Pending': 'status-pending',
+        'In Progress': 'status-in-progress',
+        'Completed': 'status-completed',
+        'Rejected': 'status-rejected'
+    };
+    return statusMap[status] || 'status-pending';
+}
+
+/**
+ * Show success message (only one at a time)
+ */
+function showMessage(text, type = 'success') {
+    // Remove any existing messages first
+    const existingMessages = document.querySelectorAll('.message');
+    existingMessages.forEach(msg => msg.remove());
+    
+    const messageDiv = document.createElement('div');
+    messageDiv.className = `message message-${type}`;
+    messageDiv.innerHTML = `
+        <i class="fas fa-${type === 'success' ? 'check-circle' : type === 'error' ? 'exclamation-circle' : 'info-circle'}"></i>
+        <span>${text}</span>
+    `;
+    
+    const mainContent = document.querySelector('.main-content');
+    const firstSection = mainContent.querySelector('.content-section.active');
+    firstSection.insertBefore(messageDiv, firstSection.firstChild);
+    
+    // Auto remove after 3 seconds (reduced from 5)
+    setTimeout(() => {
+        if (messageDiv.parentNode) {
+            messageDiv.remove();
+        }
+    }, 3000);
+}
+
+/**
+ * Update statistics
+ */
+function updateStats() {
+    const pendingCount = requests.filter(r => r.status === 'Pending').length;
+    const completedCount = requests.filter(r => r.status === 'Completed').length;
+    const thisMonthCount = requests.filter(r => {
+        const requestDate = new Date(r.dateSubmitted);
+        const currentDate = new Date();
+        return requestDate.getMonth() === currentDate.getMonth() && 
+               requestDate.getFullYear() === currentDate.getFullYear();
+    }).length;
+    
+    document.getElementById('pendingCount').textContent = pendingCount;
+    document.getElementById('completedCount').textContent = completedCount;
+    document.getElementById('thisMonth').textContent = thisMonthCount;
+    document.getElementById('leaveBalance').textContent = `${currentUser.leaveBalance.annual}`;
+}
+
+// ===== NAVIGATION FUNCTIONS =====
+
+/**
+ * Initialize navigation
+ */
+function initNavigation() {
+    const navLinks = document.querySelectorAll('.nav-link');
+    
+    navLinks.forEach(link => {
+        link.addEventListener('click', function(e) {
+            e.preventDefault();
+            
+            const sectionId = this.getAttribute('data-section');
+            if (sectionId && sectionId !== currentSection) {
+                switchSection(sectionId);
+                
+                // Update active nav link
+                navLinks.forEach(l => l.classList.remove('active'));
+                this.classList.add('active');
+                
+                currentSection = sectionId;
+                
+                // Close mobile menu
+                closeMobileMenu();
+                
+                // Remove hints after first interaction
+                removeNavigationHints();
+            }
+        });
+    });
+    
+    // Logo click to toggle menu
+    const navBrand = document.getElementById('navBrand');
+    const sidebar = document.querySelector('.sidebar');
+    
+    if (navBrand) {
+        navBrand.addEventListener('click', function() {
+            if (window.innerWidth <= 1024) {
+                toggleMobileMenu();
+                removeNavigationHints();
+            }
+        });
+    }
+    
+    // Close mobile menu when clicking outside
+    document.addEventListener('click', function(e) {
+        if (window.innerWidth <= 1024) {
+            const sidebar = document.querySelector('.sidebar');
+            const navBrand = document.getElementById('navBrand');
+            
+            if (!sidebar.contains(e.target) && !navBrand.contains(e.target)) {
+                closeMobileMenu();
+            }
+        }
+    });
+    
+    // Initialize navigation hints
+    initNavigationHints();
+}
+
+/**
+ * Initialize subtle navigation hints
+ */
+function initNavigationHints() {
+    const navBrand = document.getElementById('navBrand');
+    const menuHint = document.getElementById('menuHint');
+    
+    // Only show hints on mobile/tablet
+    if (window.innerWidth <= 1024) {
+        // Add subtle pulse animation to logo
+        setTimeout(() => {
+            navBrand.classList.add('pulse');
+        }, 2000);
+        
+        // Add bounce animation to hint arrow
+        setTimeout(() => {
+            menuHint.classList.add('bounce');
+        }, 3000);
+        
+        // Remove animations after 10 seconds
+        setTimeout(() => {
+            navBrand.classList.remove('pulse');
+            menuHint.classList.remove('bounce');
+        }, 12000);
+    }
+}
+
+/**
+ * Remove navigation hints after user interaction
+ */
+function removeNavigationHints() {
+    const navBrand = document.getElementById('navBrand');
+    const menuHint = document.getElementById('menuHint');
+    
+    navBrand.classList.remove('pulse');
+    menuHint.classList.remove('bounce');
+    
+    // Store that user has discovered navigation
+    localStorage.setItem('officeflow_nav_discovered', 'true');
+}
+
+/**
+ * Toggle mobile menu
+ */
+function toggleMobileMenu() {
+    const sidebar = document.querySelector('.sidebar');
+    
+    sidebar.classList.toggle('open');
+    
+    // Add overlay for better UX
+    if (sidebar.classList.contains('open')) {
+        document.body.style.overflow = 'hidden';
+    } else {
+        document.body.style.overflow = '';
+    }
+}
+
+/**
+ * Close mobile menu
+ */
+function closeMobileMenu() {
+    const sidebar = document.querySelector('.sidebar');
+    
+    sidebar.classList.remove('open');
+    document.body.style.overflow = '';
+}
+
+/**
+ * Switch between sections
+ */
+function switchSection(sectionId) {
+    // Hide all sections
+    const sections = document.querySelectorAll('.content-section');
+    sections.forEach(section => {
+        section.classList.remove('active');
+    });
+    
+    // Show target section
+    const targetSection = document.getElementById(sectionId);
+    if (targetSection) {
+        targetSection.classList.add('active');
+        
+        // Load section-specific content
+        switch(sectionId) {
+            case 'overview':
+                loadOverview();
+                break;
+            case 'your-requests':
+                loadYourRequests();
+                break;
+            case 'hr-services':
+                loadHRServices();
+                break;
+            case 'profile':
+                loadProfile();
+                break;
+            case 'settings':
+                loadSettings();
+                break;
+        }
+    }
+}
+
+// ===== OVERVIEW SECTION =====
+
+/**
+ * Load overview section
+ */
+function loadOverview() {
+    updateStats();
+    loadRecentActivity();
+}
+
+/**
+ * Load recent activity
+ */
+function loadRecentActivity() {
+    const activityList = document.getElementById('recentActivity');
+    const recentRequests = requests
+        .sort((a, b) => new Date(b.lastUpdated) - new Date(a.lastUpdated))
+        .slice(0, 5);
+    
+    activityList.innerHTML = recentRequests.map(request => `
+        <div class="activity-item">
+            <div class="activity-icon">
+                <i class="fas fa-${getActivityIcon(request.category)}"></i>
+            </div>
+            <div class="activity-content">
+                <div class="activity-text">
+                    ${request.title} - ${request.status}
+                </div>
+                <div class="activity-time">
+                    ${formatDate(request.lastUpdated)}
+                </div>
+            </div>
+        </div>
+    `).join('');
+}
+
+/**
+ * Get activity icon based on category
+ */
+function getActivityIcon(category) {
+    const iconMap = {
+        'IT': 'laptop',
+        'Maintenance': 'tools',
+        'HR': 'users'
+    };
+    return iconMap[category] || 'file-alt';
+}
+
+// ===== REQUEST FORM FUNCTIONS =====
+
+/**
+ * Initialize request form
+ */
+function initRequestForm() {
+    const form = document.getElementById('requestForm');
+    const clearBtn = document.getElementById('clearForm');
+    
+    if (form) {
+        form.addEventListener('submit', handleFormSubmit);
+    }
+    
+    if (clearBtn) {
+        clearBtn.addEventListener('click', clearForm);
+    }
+    
+    // Add form validation
+    const inputs = form.querySelectorAll('input, select, textarea');
+    inputs.forEach(input => {
+        input.addEventListener('blur', validateField);
+        input.addEventListener('input', clearFieldError);
+    });
+}
+
+/**
+ * Handle form submission
+ */
+function handleFormSubmit(e) {
+    e.preventDefault();
+    
+    const formData = new FormData(e.target);
+    const requestData = {
+        id: generateRequestId(),
+        title: formData.get('title'),
+        category: formData.get('category'),
+        priority: formData.get('priority'),
+        description: formData.get('description'),
+        status: 'Pending',
+        dateSubmitted: getCurrentTimestamp(),
+        lastUpdated: getCurrentTimestamp(),
+        type: 'General'
+    };
+    
+    // Validate form
+    if (!validateForm(requestData)) {
+        return;
+    }
+    
+    // Add loading state
+    const submitBtn = document.getElementById('submitRequest');
+    const originalText = submitBtn.innerHTML;
+    submitBtn.innerHTML = '<span class="spinner"></span> Submitting...';
+    submitBtn.disabled = true;
+    
+    // Simulate API call
+    setTimeout(() => {
+        // Add request to array
+        requests.unshift(requestData);
+        
+        // Reset form
+        clearForm();
+        
+        // Show success message
+        showMessage('Request submitted successfully! You will receive updates via email.');
+        
+        // Update stats
+        updateStats();
+        
+        // Reset button
+        submitBtn.innerHTML = originalText;
+        submitBtn.disabled = false;
+        
+        // Switch to requests view
+        switchSection('your-requests');
+        document.querySelector('[data-section="your-requests"]').classList.add('active');
+        document.querySelector('[data-section="submit-request"]').classList.remove('active');
+        
+        console.log('New request submitted:', requestData);
+    }, 1500);
+}
+
+/**
+ * Validate form
+ */
+function validateForm(data) {
+    let isValid = true;
+    
+    if (!data.title.trim()) {
+        showFieldError('requestTitle', 'Title is required');
+        isValid = false;
+    }
+    
+    if (!data.category) {
+        showFieldError('requestCategory', 'Category is required');
+        isValid = false;
+    }
+    
+    if (!data.priority) {
+        showFieldError('requestPriority', 'Priority is required');
+        isValid = false;
+    }
+    
+    if (!data.description.trim()) {
+        showFieldError('requestDescription', 'Description is required');
+        isValid = false;
+    }
+    
+    return isValid;
+}
+
+/**
+ * Validate individual field
+ */
+function validateField(e) {
+    const field = e.target;
+    const value = field.value.trim();
+    
+    if (field.hasAttribute('required') && !value) {
+        showFieldError(field.id, `${field.name} is required`);
+    }
+}
+
+/**
+ * Show field error
+ */
+function showFieldError(fieldId, message) {
+    const field = document.getElementById(fieldId);
+    field.classList.add('error');
+    
+    // Remove existing error message
+    const existingError = field.parentNode.querySelector('.field-error');
+    if (existingError) {
+        existingError.remove();
+    }
+    
+    // Add error message
+    const errorDiv = document.createElement('div');
+    errorDiv.className = 'field-error';
+    errorDiv.style.cssText = 'color: var(--error-color); font-size: 0.75rem; margin-top: 0.25rem;';
+    errorDiv.textContent = message;
+    field.parentNode.appendChild(errorDiv);
+}
+
+/**
+ * Clear field error
+ */
+function clearFieldError(e) {
+    const field = e.target;
+    field.classList.remove('error');
+    
+    const errorDiv = field.parentNode.querySelector('.field-error');
+    if (errorDiv) {
+        errorDiv.remove();
+    }
+}
+
+/**
+ * Clear form
+ */
+function clearForm() {
+    const form = document.getElementById('requestForm');
+    form.reset();
+    
+    // Clear any error states
+    const errorFields = form.querySelectorAll('.error');
+    errorFields.forEach(field => {
+        field.classList.remove('error');
+    });
+    
+    const errorMessages = form.querySelectorAll('.field-error');
+    errorMessages.forEach(msg => msg.remove());
+}
+
+// ===== YOUR REQUESTS SECTION =====
+
+/**
+ * Load your requests section
+ */
+function loadYourRequests() {
+    renderRequests();
+    initFilters();
+}
+
+/**
+ * Render requests grid
+ */
+function renderRequests() {
+    const grid = document.getElementById('requestsGrid');
+    
+    if (filteredRequests.length === 0) {
+        grid.innerHTML = `
+            <div style="grid-column: 1 / -1; text-align: center; padding: 3rem; color: var(--gray-500);">
+                <i class="fas fa-inbox" style="font-size: 3rem; margin-bottom: 1rem; display: block;"></i>
+                <h3>No requests found</h3>
+                <p>Try adjusting your filters or submit a new request.</p>
+            </div>
+        `;
+        return;
+    }
+    
+    grid.innerHTML = filteredRequests.map(request => `
+        <div class="request-card">
+            <div class="request-header">
+                <div>
+                    <h3 class="request-title">${request.title}</h3>
+                    <span class="request-category">${request.category}</span>
+                </div>
+            </div>
+            <p class="request-description">${request.description}</p>
+            <div class="request-footer">
+                <span class="request-status ${getStatusClass(request.status)}">
+                    ${request.status}
+                </span>
+                <span class="request-date">${formatDate(request.dateSubmitted)}</span>
+            </div>
+        </div>
+    `).join('');
+}
+
+/**
+ * Initialize filters
+ */
+function initFilters() {
+    const statusFilter = document.getElementById('statusFilter');
+    const categoryFilter = document.getElementById('categoryFilter');
+    const clearFilters = document.getElementById('clearFilters');
+    
+    statusFilter.addEventListener('change', applyFilters);
+    categoryFilter.addEventListener('change', applyFilters);
+    clearFilters.addEventListener('click', function() {
+        statusFilter.value = '';
+        categoryFilter.value = '';
+        applyFilters();
+    });
+}
+
+/**
+ * Apply filters to requests
+ */
+function applyFilters() {
+    const statusFilter = document.getElementById('statusFilter').value;
+    const categoryFilter = document.getElementById('categoryFilter').value;
+    
+    filteredRequests = requests.filter(request => {
+        const matchesStatus = !statusFilter || request.status === statusFilter;
+        const matchesCategory = !categoryFilter || request.category === categoryFilter;
+        return matchesStatus && matchesCategory;
+    });
+    
+    renderRequests();
+}
+
+// ===== HR SERVICES SECTION =====
+
+/**
+ * Load HR services section
+ */
+function loadHRServices() {
+    updateLeaveBalance();
+}
+
+/**
+ * Update leave balance display
+ */
+function updateLeaveBalance() {
+    document.getElementById('annualLeave').textContent = `${currentUser.leaveBalance.annual} days`;
+    document.getElementById('sickLeave').textContent = `${currentUser.leaveBalance.sick} days`;
+    document.getElementById('personalLeave').textContent = `${currentUser.leaveBalance.personal} days`;
+    document.getElementById('emergencyLeave').textContent = `${currentUser.leaveBalance.emergency} days`;
+}
+
+// ===== SERVICE BUTTONS =====
+
+/**
+ * Initialize service buttons
+ */
+function initServiceButtons() {
+    const serviceButtons = document.querySelectorAll('.service-btn');
+    
+    serviceButtons.forEach(button => {
+        button.addEventListener('click', function() {
+            const category = this.getAttribute('data-category');
+            const type = this.getAttribute('data-type');
+            
+            // Pre-fill form and switch to submit section
+            switchSection('submit-request');
+            document.querySelector('[data-section="submit-request"]').classList.add('active');
+            document.querySelector('[data-section="overview"]').classList.remove('active');
+            
+            // Update nav
+            document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+            document.querySelector('[data-section="submit-request"]').classList.add('active');
+            
+            // Pre-fill form
+            setTimeout(() => {
+                document.getElementById('requestCategory').value = category;
+                document.getElementById('requestTitle').focus();
+                
+                // Pre-fill title based on type
+                const titleSuggestions = {
+                    'Hardware': 'Hardware Issue - ',
+                    'Software': 'Software Request - ',
+                    'Network': 'Network Issue - ',
+                    'Electrical': 'Electrical Issue - ',
+                    'Plumbing': 'Plumbing Issue - ',
+                    'HVAC': 'HVAC Issue - ',
+                    'Leave': 'Leave Request - ',
+                    'Documents': 'Document Request - ',
+                    'Profile': 'Profile Update Request - '
+                };
+                
+                if (titleSuggestions[type]) {
+                    document.getElementById('requestTitle').value = titleSuggestions[type];
+                }
+            }, 100);
+        });
+    });
+}
+
+// ===== USER FUNCTIONS =====
+
+/**
+ * Initialize user info
+ */
+function initUserInfo() {
+    document.getElementById('userName').textContent = currentUser.name;
+}
+
+/**
+ * Handle logout
+ */
+function handleLogout() {
+    const logoutBtn = document.getElementById('logoutBtn');
+    
+    logoutBtn.addEventListener('click', function() {
+        // Show confirmation
+        if (confirm('Are you sure you want to logout?')) {
+            // Add loading state
+            this.innerHTML = '<span class="spinner"></span> Logging out...';
+            this.disabled = true;
+            
+            // Simulate logout delay
+            setTimeout(() => {
+                console.log('User logged out');
+                window.location.href = 'index.html';
+            }, 1000);
+        }
+    });
+}
+
+// ===== INITIALIZATION =====
+
+/**
+ * Initialize dashboard when DOM is loaded
+ */
+document.addEventListener('DOMContentLoaded', function() {
+    console.log('officeFlow Dashboard Initialized');
+    
+    // Initialize all components
+    initNavigation();
+    initRequestForm();
+    initServiceButtons();
+    initUserInfo();
+    initUserInterface();
+    initSettingsActions();
+    handleLogout();
+    
+    // Apply user preferences
+    applyAccessibilitySettings();
+    applyTheme(currentUser.preferences.theme);
+    applyColorScheme(currentUser.preferences.colorScheme);
+    
+    // Load initial section
+    loadOverview();
+    
+    // Check if user has discovered navigation before
+    const hasDiscoveredNav = localStorage.getItem('officeflow_nav_discovered');
+    if (!hasDiscoveredNav && window.innerWidth <= 1024) {
+        // Show hints for new users on mobile
+        setTimeout(() => {
+            initNavigationHints();
+        }, 1000);
+    }
+    
+    // Update stats periodically (simulate real-time updates)
+    setInterval(updateStats, 30000); // Every 30 seconds
+    
+    console.log('Dashboard ready for user interaction');
+    console.log('Current user:', currentUser);
+    console.log('Total requests:', requests.length);
+});
+
+// ===== FIREBASE INTEGRATION PREPARATION =====
+
+/**
+ * TODO: Firebase Integration
+ * 
+ * When Firebase is set up, replace the simulation functions with:
+ * 
+ * 1. Authentication:
+ *    - Check if user is authenticated on page load
+ *    - Redirect to login if not authenticated
+ *    - Load user data from Firestore
+ * 
+ * 2. Real-time Data:
+ *    - Listen to user's requests collection
+ *    - Update UI when requests change
+ *    - Sync leave balance with HR system
+ * 
+ * 3. Request Management:
+ *    - Save new requests to Firestore
+ *    - Update request status in real-time
+ *    - Send notifications for status changes
+ * 
+ * 4. User Management:
+ *    - Load user profile from Firestore
+ *    - Update leave balance based on approved requests
+ *    - Sync with company directory
+ * 
+ * Example Firebase functions:
+ * 
+ * async function loadUserRequests(userId) {
+ *     const requestsRef = collection(db, 'requests');
+ *     const q = query(requestsRef, where('userId', '==', userId));
+ *     const querySnapshot = await getDocs(q);
+ *     return querySnapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+ * }
+ * 
+ * async function submitRequest(requestData) {
+ *     const docRef = await addDoc(collection(db, 'requests'), {
+ *         ...requestData,
+ *         userId: currentUser.id,
+ *         timestamp: serverTimestamp()
+ *     });
+ *     return docRef.id;
+ * }
+ */
+// ===== PROFILE FUNCTIONS =====
+
+/**
+ * Load profile section
+ */
+function loadProfile() {
+    updateProfileDisplay();
+    initProfileForm();
+    initAvatarSelection();
+}
+
+/**
+ * Update profile display
+ */
+function updateProfileDisplay() {
+    document.getElementById('profileName').textContent = currentUser.name;
+    document.getElementById('profileEmail').textContent = currentUser.email;
+    document.getElementById('profileRole').textContent = currentUser.role;
+    
+    // Update avatar
+    const avatarLarge = document.getElementById('profileAvatarLarge');
+    avatarLarge.innerHTML = `<i class="fas fa-${currentUser.avatar}"></i>`;
+    
+    // Update form fields
+    document.getElementById('firstName').value = currentUser.firstName;
+    document.getElementById('lastName').value = currentUser.lastName;
+    document.getElementById('email').value = currentUser.email;
+    document.getElementById('phoneNumber').value = currentUser.phoneNumber;
+    document.getElementById('jobTitle').value = currentUser.jobTitle;
+    document.getElementById('defaultCategory').value = currentUser.preferences.defaultCategory;
+    document.getElementById('timezone').value = currentUser.preferences.timezone;
+    document.getElementById('dateFormat').value = currentUser.preferences.dateFormat;
+    document.getElementById('fontSize').value = currentUser.preferences.fontSize;
+    document.getElementById('highContrast').checked = currentUser.preferences.highContrast;
+}
+
+/**
+ * Initialize profile form
+ */
+function initProfileForm() {
+    const profileForm = document.getElementById('profileForm');
+    const resetBtn = document.getElementById('resetProfileForm');
+    const deactivateBtn = document.getElementById('deactivateAccountBtn');
+    
+    if (profileForm) {
+        profileForm.addEventListener('submit', handleProfileSubmit);
+    }
+    
+    if (resetBtn) {
+        resetBtn.addEventListener('click', function() {
+            updateProfileDisplay();
+            showMessage('Form reset to current values', 'info');
+        });
+    }
+    
+    if (deactivateBtn) {
+        deactivateBtn.addEventListener('click', handleAccountDeactivation);
+    }
+}
+
+/**
+ * Handle profile form submission
+ */
+function handleProfileSubmit(e) {
+    e.preventDefault();
+    
+    const formData = new FormData(e.target);
+    
+    // Update user data
+    currentUser.firstName = formData.get('firstName');
+    currentUser.lastName = formData.get('lastName');
+    currentUser.name = `${currentUser.firstName} ${currentUser.lastName}`;
+    currentUser.email = formData.get('email');
+    currentUser.phoneNumber = formData.get('phoneNumber');
+    currentUser.jobTitle = formData.get('jobTitle');
+    currentUser.preferences.defaultCategory = formData.get('defaultCategory');
+    currentUser.preferences.timezone = formData.get('timezone');
+    currentUser.preferences.dateFormat = formData.get('dateFormat');
+    currentUser.preferences.fontSize = formData.get('fontSize');
+    currentUser.preferences.highContrast = formData.get('highContrast') === 'on';
+    
+    // Apply accessibility settings
+    applyAccessibilitySettings();
+    
+    // Update UI
+    initUserInfo();
+    updateProfileDisplay();
+    
+    // Show success message
+    showMessage('Profile updated successfully!');
+    
+    console.log('Profile updated:', currentUser);
+}
+
+/**
+ * Handle account deactivation request
+ */
+function handleAccountDeactivation() {
+    const confirmed = confirm(
+        'Are you sure you want to request account deactivation?\n\n' +
+        'This will:\n' +
+        '• Send a request to administrators for approval\n' +
+        '• Temporarily disable your account access\n' +
+        '• Require admin approval to reactivate\n\n' +
+        'This action cannot be undone without admin intervention.'
+    );
+    
+    if (confirmed) {
+        showMessage('Account deactivation request submitted. An administrator will review your request.', 'info');
+        console.log('Account deactivation requested for user:', currentUser.id);
+    }
+}
+
+/**
+ * Initialize avatar selection
+ */
+function initAvatarSelection() {
+    const changeAvatarBtn = document.getElementById('changeAvatarBtn');
+    const avatarModal = document.getElementById('avatarModal');
+    const closeModal = document.getElementById('closeAvatarModal');
+    const cancelBtn = document.getElementById('cancelAvatarChange');
+    const confirmBtn = document.getElementById('confirmAvatarChange');
+    const avatarOptions = document.querySelectorAll('.avatar-option');
+    
+    let selectedAvatar = currentUser.avatar;
+    
+    // Open modal
+    changeAvatarBtn.addEventListener('click', function() {
+        avatarModal.classList.add('active');
+        
+        // Set current avatar as selected
+        avatarOptions.forEach(option => {
+            option.classList.remove('active');
+            if (option.getAttribute('data-avatar') === currentUser.avatar) {
+                option.classList.add('active');
+            }
+        });
+    });
+    
+    // Close modal
+    function closeAvatarModal() {
+        avatarModal.classList.remove('active');
+    }
+    
+    closeModal.addEventListener('click', closeAvatarModal);
+    cancelBtn.addEventListener('click', closeAvatarModal);
+    
+    // Avatar selection
+    avatarOptions.forEach(option => {
+        option.addEventListener('click', function() {
+            avatarOptions.forEach(opt => opt.classList.remove('active'));
+            this.classList.add('active');
+            selectedAvatar = this.getAttribute('data-avatar');
+        });
+    });
+    
+    // Confirm avatar change
+    confirmBtn.addEventListener('click', function() {
+        currentUser.avatar = selectedAvatar;
+        
+        // Update all avatar displays
+        const userAvatar = document.querySelector('.user-avatar i');
+        const profileAvatarLarge = document.getElementById('profileAvatarLarge');
+        
+        userAvatar.className = `fas fa-${selectedAvatar}`;
+        profileAvatarLarge.innerHTML = `<i class="fas fa-${selectedAvatar}"></i>`;
+        
+        closeAvatarModal();
+        showMessage('Avatar updated successfully!');
+    });
+    
+    // Close modal when clicking outside
+    avatarModal.addEventListener('click', function(e) {
+        if (e.target === avatarModal) {
+            closeAvatarModal();
+        }
+    });
+}
+
+// ===== SETTINGS FUNCTIONS =====
+
+/**
+ * Load settings section
+ */
+function loadSettings() {
+    initSettingsTabs();
+    initThemeSettings();
+    initNotificationSettings();
+    initPrivacySettings();
+}
+
+/**
+ * Initialize settings tabs
+ */
+function initSettingsTabs() {
+    const tabs = document.querySelectorAll('.settings-tab');
+    const contents = document.querySelectorAll('.settings-content');
+    const goToProfileBtn = document.getElementById('goToProfile');
+    
+    tabs.forEach(tab => {
+        tab.addEventListener('click', function() {
+            const targetTab = this.getAttribute('data-tab');
+            
+            // Update active tab
+            tabs.forEach(t => t.classList.remove('active'));
+            this.classList.add('active');
+            
+            // Update active content
+            contents.forEach(content => {
+                content.classList.remove('active');
+                if (content.id === targetTab) {
+                    content.classList.add('active');
+                }
+            });
+        });
+    });
+    
+    // Go to profile button
+    if (goToProfileBtn) {
+        goToProfileBtn.addEventListener('click', function() {
+            switchSection('profile');
+            document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+            document.querySelector('[data-section="profile"]').classList.add('active');
+        });
+    }
+}
+
+/**
+ * Initialize theme settings
+ */
+function initThemeSettings() {
+    const themeInputs = document.querySelectorAll('input[name="theme"]');
+    const colorSchemeInputs = document.querySelectorAll('input[name="colorScheme"]');
+    
+    // Set current values
+    themeInputs.forEach(input => {
+        if (input.value === currentUser.preferences.theme) {
+            input.checked = true;
+        }
+    });
+    
+    colorSchemeInputs.forEach(input => {
+        if (input.value === currentUser.preferences.colorScheme) {
+            input.checked = true;
+        }
+    });
+    
+    // Theme change handlers
+    themeInputs.forEach(input => {
+        input.addEventListener('change', function() {
+            if (this.checked) {
+                currentUser.preferences.theme = this.value;
+                applyTheme(this.value);
+                // Only show message for theme changes, not color scheme
+                if (this.value !== 'light') { // Don't show message for default light theme
+                    showMessage(`Switched to ${this.value} theme`, 'info');
+                }
+            }
+        });
+    });
+    
+    // Color scheme change handlers
+    colorSchemeInputs.forEach(input => {
+        input.addEventListener('change', function() {
+            if (this.checked) {
+                applyColorScheme(this.value);
+                // Only show message for non-default color schemes
+                if (this.value !== 'warm') {
+                    showMessage(`Applied ${this.value} color scheme`, 'info');
+                }
+            }
+        });
+    });
+}
+
+/**
+ * Apply theme
+ */
+function applyTheme(theme) {
+    const body = document.body;
+    
+    // Remove existing theme classes
+    body.classList.remove('light-theme', 'dark-theme', 'auto-theme');
+    
+    if (theme === 'dark') {
+        body.classList.add('dark-theme');
+    } else if (theme === 'auto') {
+        // Check system preference
+        const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+        body.classList.add(prefersDark ? 'dark-theme' : 'light-theme');
+    } else {
+        body.classList.add('light-theme');
+    }
+}
+
+/**
+ * Apply color scheme
+ */
+function applyColorScheme(scheme) {
+    const root = document.documentElement;
+    
+    switch (scheme) {
+        case 'cool':
+            // Cool blue/cyan theme
+            root.style.setProperty('--primary-color', '#3b82f6');
+            root.style.setProperty('--primary-hover', '#2563eb');
+            root.style.setProperty('--primary-light', '#dbeafe');
+            root.style.setProperty('--primary-dark', '#1d4ed8');
+            root.style.setProperty('--secondary-color', '#06b6d4');
+            root.style.setProperty('--secondary-hover', '#0891b2');
+            root.style.setProperty('--secondary-light', '#cffafe');
+            root.style.setProperty('--accent-color', '#8b5cf6');
+            root.style.setProperty('--accent-hover', '#7c3aed');
+            root.style.setProperty('--accent-light', '#f3e8ff');
+            root.style.setProperty('--gradient-primary', 'linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%)');
+            root.style.setProperty('--gradient-accent', 'linear-gradient(135deg, #8b5cf6 0%, #06b6d4 100%)');
+            root.style.setProperty('--gradient-bg', 'linear-gradient(135deg, #dbeafe 0%, #e0e7ff 25%, #f3e8ff 50%, #cffafe 75%, #dbeafe 100%)');
+            break;
+        case 'nature':
+            // Green/nature theme
+            root.style.setProperty('--primary-color', '#10b981');
+            root.style.setProperty('--primary-hover', '#059669');
+            root.style.setProperty('--primary-light', '#d1fae5');
+            root.style.setProperty('--primary-dark', '#047857');
+            root.style.setProperty('--secondary-color', '#84cc16');
+            root.style.setProperty('--secondary-hover', '#65a30d');
+            root.style.setProperty('--secondary-light', '#ecfccb');
+            root.style.setProperty('--accent-color', '#f59e0b');
+            root.style.setProperty('--accent-hover', '#d97706');
+            root.style.setProperty('--accent-light', '#fef3c7');
+            root.style.setProperty('--gradient-primary', 'linear-gradient(135deg, #10b981 0%, #f59e0b 100%)');
+            root.style.setProperty('--gradient-accent', 'linear-gradient(135deg, #f59e0b 0%, #84cc16 100%)');
+            root.style.setProperty('--gradient-bg', 'linear-gradient(135deg, #d1fae5 0%, #ecfccb 25%, #fef3c7 50%, #d1fae5 75%, #ecfccb 100%)');
+            break;
+        default: // warm
+            // Warm orange/coral theme (original)
+            root.style.setProperty('--primary-color', '#fb923c');
+            root.style.setProperty('--primary-hover', '#f97316');
+            root.style.setProperty('--primary-light', '#fed7aa');
+            root.style.setProperty('--primary-dark', '#ea580c');
+            root.style.setProperty('--secondary-color', '#f87171');
+            root.style.setProperty('--secondary-hover', '#ef4444');
+            root.style.setProperty('--secondary-light', '#fecaca');
+            root.style.setProperty('--accent-color', '#fbbf24');
+            root.style.setProperty('--accent-hover', '#f59e0b');
+            root.style.setProperty('--accent-light', '#fef3c7');
+            root.style.setProperty('--gradient-primary', 'linear-gradient(135deg, #fb923c 0%, #fbbf24 100%)');
+            root.style.setProperty('--gradient-accent', 'linear-gradient(135deg, #fbbf24 0%, #f87171 100%)');
+            root.style.setProperty('--gradient-bg', 'linear-gradient(135deg, #fef7ed 0%, #fed7aa 25%, #fecaca 50%, #fef3c7 75%, #fef7ed 100%)');
+            break;
+    }
+    
+    // Update current user preference
+    currentUser.preferences.colorScheme = scheme;
+}
+
+/**
+ * Initialize notification settings
+ */
+function initNotificationSettings() {
+    const notificationInputs = document.querySelectorAll('#notifications input[type="checkbox"]');
+    
+    notificationInputs.forEach(input => {
+        input.addEventListener('change', function() {
+            const setting = this.id;
+            const enabled = this.checked;
+            
+            // Store preference (would sync with backend in real app)
+            console.log(`Notification setting ${setting}: ${enabled}`);
+            
+            showMessage(`${enabled ? 'Enabled' : 'Disabled'} ${setting.replace(/([A-Z])/g, ' $1').toLowerCase()}`, 'info');
+        });
+    });
+}
+
+/**
+ * Initialize privacy settings
+ */
+function initPrivacySettings() {
+    const privacyInputs = document.querySelectorAll('#privacy input[type="checkbox"]');
+    
+    privacyInputs.forEach(input => {
+        input.addEventListener('change', function() {
+            const setting = this.id;
+            const enabled = this.checked;
+            
+            // Store preference (would sync with backend in real app)
+            console.log(`Privacy setting ${setting}: ${enabled}`);
+            
+            showMessage(`${enabled ? 'Enabled' : 'Disabled'} ${setting.replace(/([A-Z])/g, ' $1').toLowerCase()}`, 'info');
+        });
+    });
+}
+
+/**
+ * Apply accessibility settings
+ */
+function applyAccessibilitySettings() {
+    const body = document.body;
+    const fontSize = currentUser.preferences.fontSize;
+    const highContrast = currentUser.preferences.highContrast;
+    
+    // Remove existing font size classes
+    body.classList.remove('font-small', 'font-medium', 'font-large', 'font-extra-large');
+    body.classList.add(`font-${fontSize}`);
+    
+    // Apply high contrast
+    if (highContrast) {
+        body.classList.add('high-contrast');
+    } else {
+        body.classList.remove('high-contrast');
+    }
+}
+
+/**
+ * Initialize settings actions
+ */
+function initSettingsActions() {
+    const resetBtn = document.getElementById('resetSettings');
+    const saveBtn = document.getElementById('saveSettings');
+    
+    if (resetBtn) {
+        resetBtn.addEventListener('click', function() {
+            if (confirm('Reset all settings to default values?')) {
+                // Reset to defaults
+                currentUser.preferences = {
+                    defaultCategory: '',
+                    timezone: 'America/New_York',
+                    dateFormat: 'MM/DD/YYYY',
+                    fontSize: 'medium',
+                    highContrast: false,
+                    theme: 'light',
+                    colorScheme: 'warm'
+                };
+                
+                // Reload settings
+                loadSettings();
+                applyAccessibilitySettings();
+                applyTheme('light');
+                applyColorScheme('warm');
+                
+                showMessage('Settings reset to defaults');
+            }
+        });
+    }
+    
+    if (saveBtn) {
+        saveBtn.addEventListener('click', function() {
+            showMessage('Settings saved successfully!');
+            console.log('Settings saved:', currentUser.preferences);
+        });
+    }
+}
+
+// ===== USER INTERFACE FUNCTIONS =====
+
+/**
+ * Initialize user avatar and settings buttons
+ */
+function initUserInterface() {
+    const userAvatarBtn = document.getElementById('userAvatarBtn');
+    const settingsBtn = document.getElementById('settingsBtn');
+    
+    // User avatar click - go to profile
+    if (userAvatarBtn) {
+        userAvatarBtn.addEventListener('click', function() {
+            switchSection('profile');
+            document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+            document.querySelector('[data-section="profile"]').classList.add('active');
+            currentSection = 'profile';
+        });
+    }
+    
+    // Settings button click - go to settings
+    if (settingsBtn) {
+        settingsBtn.addEventListener('click', function() {
+            switchSection('settings');
+            document.querySelectorAll('.nav-link').forEach(l => l.classList.remove('active'));
+            document.querySelector('[data-section="settings"]').classList.add('active');
+            currentSection = 'settings';
+        });
+    }
+}
