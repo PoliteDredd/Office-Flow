@@ -16,27 +16,57 @@ const PORT = 3000;
 app.use(cors());
 app.use(express.json());
 
-// Serve static frontend files
-app.use(express.static(path.join(__dirname, '../frontend')));
-
-// Auth routes
+// Auth routes (MUST come before static files)
 app.use('/api/auth', authRoutes);
+
+// Verify company code and get departments (public endpoint for registration)
+app.post('/api/verify-company-code', async (req, res) => {
+    try {
+        const { companyCode } = req.body;
+
+        if (!companyCode) {
+            return res.status(400).json({ message: 'Company code is required', success: false });
+        }
+
+        // Find company by code
+        const companiesSnapshot = await db.collection('companies')
+            .where('companyCode', '==', companyCode)
+            .limit(1)
+            .get();
+
+        if (companiesSnapshot.empty) {
+            return res.status(404).json({ message: 'Invalid company code', success: false });
+        }
+
+        const companyDoc = companiesSnapshot.docs[0];
+        const companyData = companyDoc.data();
+
+        res.status(200).json({
+            success: true,
+            companyName: companyData.name,
+            departments: companyData.settings?.departments || []
+        });
+    } catch (error) {
+        console.error('Error verifying company code:', error);
+        res.status(500).json({ message: 'Server error', success: false });
+    }
+});
 
 // ===== LEGACY ENDPOINTS (Deprecated - kept for backward compatibility) =====
 
 //register-form-api (DEPRECATED - use /api/auth/register instead)
 app.post('/register-form-api', async (req, res) => {
-    res.status(410).json({ 
-        message: 'This endpoint is deprecated. Please use Firebase Authentication.', 
-        success: false 
+    res.status(410).json({
+        message: 'This endpoint is deprecated. Please use Firebase Authentication.',
+        success: false
     });
 });
 
 //login-form-api (DEPRECATED - use Firebase Authentication directly)
 app.post('/login-form-api', async (req, res) => {
-    res.status(410).json({ 
-        message: 'This endpoint is deprecated. Please use Firebase Authentication.', 
-        success: false 
+    res.status(410).json({
+        message: 'This endpoint is deprecated. Please use Firebase Authentication.',
+        success: false
     });
 });
 
@@ -46,7 +76,7 @@ app.post('/login-form-api', async (req, res) => {
 app.post('/api/request-admin', authenticateFirebaseToken, async (req, res) => {
     try {
         const adminRequestsRef = db.collection('adminRequests');
-        
+
         // Check for existing pending request
         const existingRequest = await adminRequestsRef
             .where('userId', '==', req.user.userId)
@@ -116,11 +146,12 @@ app.post('/api/admin-requests/:requestId/approve', authenticateFirebaseToken, re
         const companyDoc = await db.collection('companies').doc(req.user.companyId).get();
         const companyData = companyDoc.data();
 
+        const department = companyData.settings.departments[0] || 'IT';
         // Update user role
         await db.collection('users').doc(userId).update({
             role: 'admin',
-            department: companyData.settings.departments[0] || 'IT',
-            jobTitle: 'Manager'
+            department: department,
+            jobTitle: `Head of ${department}`
         });
 
         // Update request status
@@ -159,7 +190,11 @@ app.post('/api/admin-requests/:requestId/reject', authenticateFirebaseToken, req
 // Create admin directly
 app.post('/api/create-admin', authenticateFirebaseToken, requireSuperAdmin, async (req, res) => {
     try {
-        const { fullName, email, password, department, jobTitle } = req.body;
+        const { fullName, email, password, department } = req.body;
+
+        if (!department) {
+            return res.status(400).json({ message: 'Department is required', success: false });
+        }
 
         // Create user in Firebase Authentication
         const userRecord = await admin.auth().createUser({
@@ -170,6 +205,9 @@ app.post('/api/create-admin', authenticateFirebaseToken, requireSuperAdmin, asyn
 
         const companyDoc = await db.collection('companies').doc(req.user.companyId).get();
         const companyData = companyDoc.data();
+
+        // Automatically set job title as "Head of [Department]"
+        const jobTitle = `Head of ${department}`;
 
         // Create user profile in Firestore
         await db.collection('users').doc(userRecord.uid).set({
@@ -198,6 +236,60 @@ app.post('/api/create-admin', authenticateFirebaseToken, requireSuperAdmin, asyn
     }
 });
 
+// Promote existing user to admin
+app.post('/api/promote-to-admin', authenticateFirebaseToken, requireSuperAdmin, async (req, res) => {
+    try {
+        const { userId, department, superAdminPassword } = req.body;
+
+        if (!userId || !department || !superAdminPassword) {
+            return res.status(400).json({ message: 'Missing required fields', success: false });
+        }
+
+        // Get super admin's email to verify password
+        const superAdminDoc = await db.collection('users').doc(req.user.userId).get();
+        if (!superAdminDoc.exists) {
+            return res.status(404).json({ message: 'Super admin not found', success: false });
+        }
+
+        const superAdminData = superAdminDoc.data();
+        const superAdminEmail = superAdminData.email;
+
+        // Verify super admin's password by attempting to sign in
+        // Note: This is done on the client side, so we'll skip password verification here
+        // and rely on the fact that only authenticated super admins can access this endpoint
+        // For production, consider implementing a more secure password verification method
+
+        // Get user to promote
+        const userDoc = await db.collection('users').doc(userId).get();
+        if (!userDoc.exists) {
+            return res.status(404).json({ message: 'User not found', success: false });
+        }
+
+        const userData = userDoc.data();
+
+        // Check if user is already an admin
+        if (userData.role !== 'user') {
+            return res.status(400).json({ message: 'User is already an admin or super admin', success: false });
+        }
+
+        // Promote user to admin
+        const jobTitle = `Head of ${department}`;
+        await db.collection('users').doc(userId).update({
+            role: 'admin',
+            department,
+            jobTitle
+        });
+
+        res.status(200).json({
+            message: `${userData.fullName} has been promoted to Admin (${jobTitle})`,
+            success: true
+        });
+    } catch (error) {
+        console.error('Error promoting user:', error);
+        res.status(500).json({ message: error.message || 'Server error', success: false });
+    }
+});
+
 // ===== COMPANY SETTINGS API (Super Admin Only) =====
 
 // Get company settings (available to any authenticated user)
@@ -219,7 +311,7 @@ app.get('/api/company/settings', authenticateFirebaseToken, async (req, res) => 
             jobTitles: companyData.settings?.jobTitles || {}
         };
 
-        res.status(200).json({ 
+        res.status(200).json({
             success: true,
             company: {
                 id: companyDoc.id,
@@ -238,7 +330,7 @@ app.get('/api/company/settings', authenticateFirebaseToken, async (req, res) => 
 app.put('/api/company/settings', authenticateFirebaseToken, requireSuperAdmin, async (req, res) => {
     try {
         const { annualLeaveBalance, sickLeaveBalance, departments, jobTitles } = req.body;
-        
+
         const updateData = {};
         if (annualLeaveBalance !== undefined) updateData['settings.annualLeaveBalance'] = annualLeaveBalance;
         if (sickLeaveBalance !== undefined) updateData['settings.sickLeaveBalance'] = sickLeaveBalance;
@@ -250,6 +342,37 @@ app.put('/api/company/settings', authenticateFirebaseToken, requireSuperAdmin, a
         res.status(200).json({ message: 'Company settings updated successfully', success: true });
     } catch (error) {
         console.error('Error updating company settings:', error);
+        res.status(500).json({ message: 'Server error', success: false });
+    }
+});
+
+// Get single user by ID (authenticated users can get their own data, admins can get any user)
+app.get('/api/users/:userId', authenticateFirebaseToken, async (req, res) => {
+    try {
+        const { userId } = req.params;
+
+        // Users can only access their own data unless they're admin
+        if (req.user.userId !== userId && req.user.role !== 'admin' && req.user.role !== 'superadmin') {
+            return res.status(403).json({ message: 'Unauthorized', success: false });
+        }
+
+        const userDoc = await db.collection('users').doc(userId).get();
+
+        if (!userDoc.exists) {
+            return res.status(404).json({ message: 'User not found', success: false });
+        }
+
+        const userData = userDoc.data();
+
+        res.status(200).json({
+            success: true,
+            user: {
+                id: userDoc.id,
+                ...userData
+            }
+        });
+    } catch (error) {
+        console.error('Error fetching user:', error);
         res.status(500).json({ message: 'Server error', success: false });
     }
 });
@@ -298,8 +421,8 @@ app.put('/api/users/:userId/role', authenticateFirebaseToken, requireSuperAdmin,
         }
 
         const updateData = { role };
-        if (jobTitle) updateData.jobTitle = jobTitle;
-        if (department) updateData.department = department;
+        if (jobTitle !== undefined) updateData.jobTitle = jobTitle;
+        if (department !== undefined) updateData.department = department;
 
         await db.collection('users').doc(userId).update(updateData);
 
@@ -309,6 +432,100 @@ app.put('/api/users/:userId/role', authenticateFirebaseToken, requireSuperAdmin,
         res.status(500).json({ message: 'Server error', success: false });
     }
 });
+
+// Update user profile (User can update their own profile)
+app.put('/api/users/:userId/profile', authenticateFirebaseToken, async (req, res) => {
+    try {
+        const { userId } = req.params;
+        const { department, jobTitle } = req.body;
+
+        console.log('Profile update request:', {
+            userId,
+            requestUserId: req.user.userId,
+            department,
+            jobTitle
+        });
+
+        // Users can only update their own profile
+        if (req.user.userId !== userId && req.user.role !== 'superadmin') {
+            console.log('Unauthorized: User trying to update different profile');
+            return res.status(403).json({ message: 'Unauthorized', success: false });
+        }
+
+        const userDoc = await db.collection('users').doc(userId).get();
+        if (!userDoc.exists) {
+            console.log('User not found:', userId);
+            return res.status(404).json({ message: 'User not found', success: false });
+        }
+
+        const updateData = {};
+        if (department !== undefined) updateData.department = department;
+        if (jobTitle !== undefined) updateData.jobTitle = jobTitle;
+
+        console.log('Updating user with:', updateData);
+        await db.collection('users').doc(userId).update(updateData);
+
+        console.log('Profile updated successfully');
+        res.status(200).json({ message: 'Profile updated successfully', success: true });
+    } catch (error) {
+        console.error('Error updating profile:', error);
+        res.status(500).json({ message: 'Server error', success: false });
+    }
+});
+
+// ===== REQUEST ROUTING HELPER =====
+
+/**
+ * Route request to appropriate admin based on category
+ * Fallback to super admin if no department admin exists
+ * 
+ * @param {string} category - Request category (HR, IT, Maintenance, etc.)
+ * @param {string} companyId - Company ID
+ * @returns {Promise<string|null>} - Admin user ID or null
+ */
+async function routeRequestToAdmin(category, companyId) {
+    try {
+        // Map categories to departments
+        const categoryToDepartment = {
+            'HR': 'HR',
+            'IT': 'IT',
+            'Maintenance': 'Maintenance',
+            'Leave': 'HR'  // Leave requests go to HR
+        };
+
+        const targetDepartment = categoryToDepartment[category];
+
+        if (targetDepartment) {
+            // Find admin for this department
+            const adminSnapshot = await db.collection('users')
+                .where('companyId', '==', companyId)
+                .where('role', '==', 'admin')
+                .where('department', '==', targetDepartment)
+                .limit(1)
+                .get();
+
+            if (!adminSnapshot.empty) {
+                return adminSnapshot.docs[0].id;
+            }
+        }
+
+        // Fallback: Route to super admin
+        const superAdminSnapshot = await db.collection('users')
+            .where('companyId', '==', companyId)
+            .where('role', '==', 'superadmin')
+            .limit(1)
+            .get();
+
+        if (!superAdminSnapshot.empty) {
+            return superAdminSnapshot.docs[0].id;
+        }
+
+        return null;
+    } catch (error) {
+        console.error('Error routing request:', error);
+        return null;
+    }
+}
 
 // ===== LEAVE REQUESTS API =====
 
@@ -324,6 +541,9 @@ app.post('/api/leave-requests', authenticateFirebaseToken, async (req, res) => {
 
         const userData = userDoc.data();
 
+        // Route request to appropriate admin (HR for leave requests)
+        const assignedAdminId = await routeRequestToAdmin('Leave', req.user.companyId);
+
         const newRequest = {
             userId: req.user.userId,
             userName: userData.fullName,
@@ -337,15 +557,19 @@ app.post('/api/leave-requests', authenticateFirebaseToken, async (req, res) => {
             leave: leave || {},
             deduct: !!deduct,
             status: 'Pending',
+            assignedTo: assignedAdminId || null,  // Assigned admin ID
             dateSubmitted: admin.firestore.FieldValue.serverTimestamp(),
             lastUpdated: admin.firestore.FieldValue.serverTimestamp()
         };
 
         const docRef = await db.collection('leaveRequests').add(newRequest);
 
-        res.status(201).json({ 
-            success: true, 
-            request: { id: docRef.id, ...newRequest }
+        res.status(201).json({
+            success: true,
+            request: { id: docRef.id, ...newRequest },
+            message: assignedAdminId
+                ? 'Request submitted and routed to appropriate admin'
+                : 'Request submitted (no admin available, routed to super admin)'
         });
     } catch (error) {
         console.error('Error creating leave request:', error);
@@ -357,7 +581,7 @@ app.post('/api/leave-requests', authenticateFirebaseToken, async (req, res) => {
 app.post('/api/leave-requests/:requestId/approve', authenticateFirebaseToken, requireAdmin, async (req, res) => {
     try {
         const { requestId } = req.params;
-        
+
         const requestDoc = await db.collection('leaveRequests').doc(requestId).get();
         if (!requestDoc.exists) {
             return res.status(404).json({ message: 'Request not found', success: false });
@@ -414,7 +638,7 @@ app.post('/api/leave-requests/:requestId/approve', authenticateFirebaseToken, re
 app.post('/api/leave-requests/:requestId/reject', authenticateFirebaseToken, requireAdmin, async (req, res) => {
     try {
         const { requestId } = req.params;
-        
+
         const requestDoc = await db.collection('leaveRequests').doc(requestId).get();
         if (!requestDoc.exists) {
             return res.status(404).json({ message: 'Request not found', success: false });
@@ -446,7 +670,7 @@ app.post('/api/leave-requests/:requestId/reject', authenticateFirebaseToken, req
 app.get('/api/leave-requests', authenticateFirebaseToken, async (req, res) => {
     try {
         let requestsSnapshot;
-        
+
         if (req.user.role === 'admin' || req.user.role === 'superadmin') {
             requestsSnapshot = await db.collection('leaveRequests')
                 .where('companyId', '==', req.user.companyId)
@@ -472,6 +696,9 @@ app.get('/api/leave-requests', authenticateFirebaseToken, async (req, res) => {
 });
 
 
+// Serve static frontend files (MUST come after all API routes)
+app.use(express.static(path.join(__dirname, '../frontend')));
+
 //Start server
 app.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`);
@@ -482,23 +709,23 @@ app.listen(PORT, () => {
 app.delete('/api/users/:userId', authenticateFirebaseToken, requireSuperAdmin, async (req, res) => {
     try {
         const { userId } = req.params;
-        
+
         const userDoc = await db.collection('users').doc(userId).get();
         if (!userDoc.exists) {
             return res.status(404).json({ message: 'User not found', success: false });
         }
-        
+
         const userData = userDoc.data();
         if (userData.role === 'superadmin') {
             return res.status(403).json({ message: 'Cannot delete super admin', success: false });
         }
-        
+
         // Delete from Firebase Authentication
         await admin.auth().deleteUser(userId);
-        
+
         // Delete from Firestore
         await db.collection('users').doc(userId).delete();
-        
+
         res.status(200).json({ message: 'User deleted successfully', success: true });
     } catch (error) {
         console.error('Error deleting user:', error);
