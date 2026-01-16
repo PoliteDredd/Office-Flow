@@ -12,7 +12,7 @@ const router = express.Router();
  */
 router.post('/register', verifyFirebaseToken, async (req, res) => {
     try {
-        const { fullName, email, firebaseUid, companyCode, companyName, isCreatingCompany } = req.body;
+        const { fullName, email, firebaseUid, companyCode, companyName, isCreatingCompany, department, jobTitle } = req.body;
 
         if (!fullName || !email || !firebaseUid) {
             return res.status(400).json({ message: 'Missing required fields', success: false });
@@ -25,6 +25,8 @@ router.post('/register', verifyFirebaseToken, async (req, res) => {
 
         let companyId;
         let role = 'user';
+        let userDepartment = '';
+        let userJobTitle = '';
         let leaveBalance = { annual: 20, sick: 10, personal: 0, emergency: 0 };
 
         if (isCreatingCompany) {
@@ -58,9 +60,16 @@ router.post('/register', verifyFirebaseToken, async (req, res) => {
             });
 
             role = 'superadmin';
+            userDepartment = '';
+            userJobTitle = '';
         } else {
             if (!companyCode) {
                 return res.status(400).json({ message: 'Company code is required', success: false });
+            }
+
+            // Validate department and job title for employees
+            if (!department || !jobTitle) {
+                return res.status(400).json({ message: 'Department and job title are required', success: false });
             }
 
             // Find company by code
@@ -83,6 +92,9 @@ router.post('/register', verifyFirebaseToken, async (req, res) => {
                 personal: companyData.settings.personalLeaveBalance || 0,
                 emergency: companyData.settings.emergencyLeaveBalance || 0
             };
+
+            userDepartment = department;
+            userJobTitle = jobTitle;
         }
 
         // Create user profile in Firestore
@@ -90,16 +102,16 @@ router.post('/register', verifyFirebaseToken, async (req, res) => {
             email,
             fullName,
             role,
-            jobTitle: role === 'superadmin' ? 'Head of IT' : 'Employee',
-            department: role === 'superadmin' ? 'IT' : '',
+            jobTitle: userJobTitle,
+            department: userDepartment,
             companyId,
             leaveBalance,
             createdAt: admin.firestore.FieldValue.serverTimestamp()
         });
 
-        res.status(201).json({ 
-            message: `${fullName} successfully registered!`, 
-            success: true 
+        res.status(201).json({
+            message: `${fullName} successfully registered!`,
+            success: true
         });
     } catch (error) {
         console.error('Registration error:', error);
