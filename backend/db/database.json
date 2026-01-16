@@ -1,0 +1,85 @@
+{
+  "companies": [
+    {
+      "id": "1768382252003",
+      "name": "TechCorp",
+      "companyCode": "TECH4668",
+      "settings": {
+        "annualLeaveBalance": 15,
+        "sickLeaveBalance": 10,
+        "departments": [
+          "IT",
+          "HR",
+          "Maintenance",
+          "Finance",
+          "Operations"
+        ],
+        "jobTitles": {
+          "IT": [
+            "Head of IT",
+            "IT Manager",
+            "Developer",
+            "System Administrator",
+            "IT Support"
+          ],
+          "HR": [
+            "Head of HR",
+            "HR Manager",
+            "HR Coordinator",
+            "Recruiter"
+          ],
+          "Maintenance": [
+            "Head of Maintenance",
+            "Maintenance Manager",
+            "Technician"
+          ],
+          "Finance": [
+            "Head of Finance",
+            "Finance Manager",
+            "Accountant",
+            "Financial Analyst"
+          ],
+          "Operations": [
+            "Head of Operations",
+            "Operations Manager",
+            "Coordinator"
+          ]
+        }
+      },
+      "createdAt": "2026-01-14T09:17:32.003Z"
+    }
+  ],
+  "users": [
+    {
+      "id": "1768382252584",
+      "email": "jmw28070504@gmail.com",
+      "password": "$2b$10$4YRywuAwS8gE7/37wLjOjei00SF37H7VKR1H/ofyzYKulxbDtB316",
+      "fullName": "Jason Williams",
+      "role": "superadmin",
+      "jobTitle": "Head of IT",
+      "department": "IT",
+      "companyId": "1768382252003",
+      "leaveBalance": {
+        "annual": 20,
+        "sick": 10
+      },
+      "createdAt": "2026-01-14T09:17:32.584Z"
+    },
+    {
+      "id": "1768390774300",
+      "email": "Ada1234@gmail.com",
+      "password": "$2b$10$tL2E.FC3enKL9pcS6a1Xeu2KrJAmcMeFKL9PKjtSwEo561c7LJwum",
+      "fullName": "Adam Fourie",
+      "role": "user",
+      "jobTitle": "Employee",
+      "department": "",
+      "companyId": "1768382252003",
+      "leaveBalance": {
+        "annual": 20,
+        "sick": 10
+      },
+      "createdAt": "2026-01-14T11:39:34.300Z"
+    }
+  ],
+  "adminRequests": []
+}
