@@ -33,66 +33,11 @@ let currentUser = {
     }
 };
 
-let requests = [
-    {
-        id: 'REQ001',
-        title: 'Laptop Screen Flickering',
-        category: 'IT',
-        type: 'Hardware',
-        description: 'My laptop screen has been flickering intermittently for the past few days. It happens mostly when I open multiple applications.',
-        priority: 'Medium',
-        status: 'In Progress',
-        dateSubmitted: '2024-01-10',
-        lastUpdated: '2024-01-11'
-    },
-    {
-        id: 'REQ002',
-        title: 'Annual Leave Request',
-        category: 'HR',
-        type: 'Leave',
-        description: 'Requesting 5 days of annual leave from January 25th to January 29th for a family vacation.',
-        priority: 'Low',
-        status: 'Pending',
-        dateSubmitted: '2024-01-09',
-        lastUpdated: '2024-01-09'
-    },
-    {
-        id: 'REQ003',
-        title: 'Office AC Not Working',
-        category: 'Maintenance',
-        type: 'HVAC',
-        description: 'The air conditioning unit in conference room B is not working properly. The room gets very hot during meetings.',
-        priority: 'High',
-        status: 'Completed',
-        dateSubmitted: '2024-01-08',
-        lastUpdated: '2024-01-10'
-    },
-    {
-        id: 'REQ004',
-        title: 'Software Installation Request',
-        category: 'IT',
-        type: 'Software',
-        description: 'Need Adobe Creative Suite installed on my workstation for upcoming design projects.',
-        priority: 'Medium',
-        status: 'Pending',
-        dateSubmitted: '2024-01-07',
-        lastUpdated: '2024-01-07'
-    },
-    {
-        id: 'REQ005',
-        title: 'Parking Space Assignment',
-        category: 'HR',
-        type: 'General',
-        description: 'Requesting assignment of a parking space closer to the building entrance due to mobility issues.',
-        priority: 'Medium',
-        status: 'Completed',
-        dateSubmitted: '2024-01-05',
-        lastUpdated: '2024-01-08'
-    }
-];
+// Remove hard-coded sample requests — start with an empty list in production
+let requests = [];
 
 let currentSection = 'overview';
-let filteredRequests = [...requests];
+let filteredRequests = [];
 
 // ===== UTILITY FUNCTIONS =====
 
@@ -428,6 +373,14 @@ function getActivityIcon(category) {
 function initRequestForm() {
     const form = document.getElementById('requestForm');
     const clearBtn = document.getElementById('clearForm');
+    const categorySelect = document.getElementById('requestCategory');
+    const leaveFields = document.getElementById('leaveFields');
+    const calcBtn = document.getElementById('calcLeaveBtn');
+    const leaveStart = document.getElementById('leaveStart');
+    const leaveEnd = document.getElementById('leaveEnd');
+    const leaveDaysEl = document.getElementById('leaveDays');
+    const availEl = document.getElementById('availableLeave');
+    const deductChk = document.getElementById('deductFromBalance');
     
     if (form) {
         form.addEventListener('submit', handleFormSubmit);
@@ -435,6 +388,40 @@ function initRequestForm() {
     
     if (clearBtn) {
         clearBtn.addEventListener('click', clearForm);
+    }
+
+    // Show leave fields when HR category selected
+    if (categorySelect) {
+        categorySelect.addEventListener('change', () => {
+            if (categorySelect.value === 'HR') {
+                if (leaveFields) leaveFields.style.display = 'block';
+                // show available balance
+                if (availEl) availEl.textContent = `${currentUser.leaveBalance.annual} days`;
+            } else {
+                if (leaveFields) leaveFields.style.display = 'none';
+            }
+        });
+        // initialize visibility based on current value
+        if (categorySelect.value === 'HR') {
+            if (leaveFields) leaveFields.style.display = 'block';
+            if (availEl) availEl.textContent = `${currentUser.leaveBalance.annual} days`;
+        } else {
+            if (leaveFields) leaveFields.style.display = 'none';
+        }
+    }
+
+    // Calculate leave days
+    if (calcBtn) {
+        calcBtn.addEventListener('click', () => {
+            const days = calculateLeaveDays(leaveStart.value, leaveEnd.value);
+            if (leaveDaysEl) leaveDaysEl.textContent = days;
+            if (availEl) {
+                const remaining = currentUser.leaveBalance.annual - days;
+                availEl.textContent = `${currentUser.leaveBalance.annual} available · After: ${remaining >= 0 ? remaining : 0}`;
+                if (remaining < 0) availEl.style.color = 'var(--error-color)';
+                else availEl.style.color = '';
+            }
+        });
     }
     
     // Add form validation
@@ -463,6 +450,20 @@ function handleFormSubmit(e) {
         lastUpdated: getCurrentTimestamp(),
         type: 'General'
     };
+    // If HR leave request, include dates and days
+    if (requestData.category === 'HR') {
+        const start = formData.get('leaveStart');
+        const end = formData.get('leaveEnd');
+        const days = calculateLeaveDays(start, end);
+        requestData.type = 'Leave';
+        requestData.leave = { start, end, days };
+        requestData.deduct = document.getElementById('deductFromBalance')?.checked || false;
+        // If user chose to deduct immediately, ensure enough balance
+        if (requestData.deduct && days > currentUser.leaveBalance.annual) {
+            showMessage('Not enough annual leave balance for this request.', 'error');
+            return;
+        }
+    }
     
     // Validate form
     if (!validateForm(requestData)) {
@@ -479,6 +480,12 @@ function handleFormSubmit(e) {
     setTimeout(() => {
         // Add request to array
         requests.unshift(requestData);
+
+        // Deduct leave immediately if requested
+        if (requestData.type === 'Leave' && requestData.deduct) {
+            currentUser.leaveBalance.annual = Math.max(0, currentUser.leaveBalance.annual - requestData.leave.days);
+            updateLeaveBalance();
+        }
         
         // Reset form
         clearForm();
@@ -527,8 +534,28 @@ function validateForm(data) {
         showFieldError('requestDescription', 'Description is required');
         isValid = false;
     }
+    // additional validation for leave requests
+    if (data.category === 'HR' && data.type === 'Leave') {
+        if (!data.leave || !data.leave.start || !data.leave.end || data.leave.days <= 0) {
+            showMessage('Please provide valid start/end dates for leave.', 'error');
+            isValid = false;
+        }
+    }
     
     return isValid;
+}
+
+/**
+ * Calculate inclusive days between two YYYY-MM-DD dates.
+ */
+function calculateLeaveDays(start, end) {
+    if (!start || !end) return 0;
+    const s = new Date(start);
+    const e = new Date(end);
+    if (isNaN(s) || isNaN(e) || e < s) return 0;
+    // count inclusive days
+    const diff = Math.round((e - s) / (1000 * 60 * 60 * 24)) + 1;
+    return diff;
 }
 
 /**
@@ -592,6 +619,15 @@ function clearForm() {
     
     const errorMessages = form.querySelectorAll('.field-error');
     errorMessages.forEach(msg => msg.remove());
+    // hide/reset leave fields if present
+    const leaveFields = document.getElementById('leaveFields');
+    if (leaveFields) leaveFields.style.display = 'none';
+    const leaveDaysEl = document.getElementById('leaveDays');
+    if (leaveDaysEl) leaveDaysEl.textContent = '0';
+    const availEl = document.getElementById('availableLeave');
+    if (availEl) availEl.textContent = '--';
+    const deductChk = document.getElementById('deductFromBalance');
+    if (deductChk) deductChk.checked = true;
 }
 
 // ===== YOUR REQUESTS SECTION =====
@@ -746,7 +782,46 @@ function initServiceButtons() {
  * Initialize user info
  */
 function initUserInfo() {
-    document.getElementById('userName').textContent = currentUser.name;
+    // Load stored user (if any) and merge with defaults
+    const stored = loadStoredUser();
+    if (stored) {
+        // Merge top-level fields
+        Object.assign(currentUser, stored);
+
+        // Merge preferences deeply where provided
+        if (stored.preferences) {
+            currentUser.preferences = Object.assign({}, currentUser.preferences, stored.preferences);
+        }
+        if (stored.leaveBalance) {
+            currentUser.leaveBalance = Object.assign({}, currentUser.leaveBalance, stored.leaveBalance);
+        }
+
+        // Derive display name from common fields if present
+        const derivedName = stored.fullName || stored.name ||
+            ((stored.firstName || stored.lastName) ? `${stored.firstName || ''} ${stored.lastName || ''}`.trim() : null) ||
+            (stored.email ? stored.email.split('@')[0] : null);
+
+        if (derivedName) currentUser.name = derivedName;
+    }
+
+    // Update displayed name
+    const nameEl = document.getElementById('userName');
+    if (nameEl) nameEl.textContent = currentUser.name || 'User';
+}
+
+/**
+ * Load user object from localStorage if present
+ * Returns parsed object or null
+ */
+function loadStoredUser() {
+    try {
+        const raw = localStorage.getItem('user');
+        if (!raw) return null;
+        return JSON.parse(raw);
+    } catch (e) {
+        console.warn('Failed to parse stored user:', e);
+        return null;
+    }
 }
 
 /**
@@ -784,6 +859,8 @@ document.addEventListener('DOMContentLoaded', function() {
     initRequestForm();
     initServiceButtons();
     initUserInfo();
+    // Try to load company settings to get global leave balances
+    loadCompanySettingsUser();
     initUserInterface();
     initSettingsActions();
     handleLogout();
@@ -812,6 +889,31 @@ document.addEventListener('DOMContentLoaded', function() {
     console.log('Current user:', currentUser);
     console.log('Total requests:', requests.length);
 });
+
+// Load company settings (used to sync leave balances)
+async function loadCompanySettingsUser() {
+    try {
+        const token = localStorage.getItem('authToken');
+        const headers = token ? { 'Authorization': `Bearer ${token}` } : {};
+        const res = await fetch('http://localhost:3000/api/company/settings', { headers });
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data && data.success && data.company && data.company.settings) {
+            const s = data.company.settings;
+            // Prefer company-wide leave policy if present
+            if (typeof s.annualLeaveBalance !== 'undefined') currentUser.leaveBalance.annual = s.annualLeaveBalance;
+            if (typeof s.sickLeaveBalance !== 'undefined') currentUser.leaveBalance.sick = s.sickLeaveBalance;
+            if (typeof s.personalLeaveBalance !== 'undefined') currentUser.leaveBalance.personal = s.personalLeaveBalance;
+            if (typeof s.emergencyLeaveBalance !== 'undefined') currentUser.leaveBalance.emergency = s.emergencyLeaveBalance;
+
+            // Update UI
+            updateLeaveBalance();
+            updateStats();
+        }
+    } catch (e) {
+        console.warn('Could not load company settings:', e);
+    }
+}
 
 // ===== FIREBASE INTEGRATION PREPARATION =====
 

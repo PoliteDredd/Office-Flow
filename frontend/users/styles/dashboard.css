@@ -541,6 +541,36 @@
     transform: translateY(-2px);
 }
 
+/* Small action button used in forms (e.g., Calculate Days) */
+.btn-small {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.5rem 0.8rem;
+    border-radius: 8px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: var(--transition-fast);
+    border: none;
+    background: var(--gray-100);
+    color: var(--gray-800);
+    font-size: 0.85rem;
+}
+
+#calcLeaveBtn {
+    background: linear-gradient(90deg, var(--primary-color), var(--accent-color));
+    color: white;
+    padding: 0.55rem 0.9rem;
+    border-radius: 8px;
+    box-shadow: 0 6px 18px rgba(14,30,37,0.08);
+}
+
+#calcLeaveBtn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 24px rgba(14,30,37,0.12);
+}
+
+
 /* ===== FILTER BAR ===== */
 .filter-bar {
     display: flex;
